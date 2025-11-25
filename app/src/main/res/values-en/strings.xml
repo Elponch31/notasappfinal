@@ -1,0 +1,21 @@
+<resources>
+    <string name="app_name">NotesApp</string>
+
+    <string name="notes_and_tasks">My Notes and Tasks</string>
+    <string name="notes">Notes</string>
+    <string name="tasks">Tasks</string>
+
+    <string name="new_note">New Note</string>
+    <string name="edit_note">Edit Note</string>
+    <string name="new_task">New Task</string>
+    <string name="edit_task">Edit Task</string>
+
+    <string name="title">Title</string>
+    <string name="content">Content</string>
+    <string name="save">Save</string>
+    <string name="delete">Delete</string>
+    <string name="back">Back</string>
+    <string name="add">Add</string>
+    <string name="select_item_to_view">Selecciona un elemento para ver</string>
+
+</resources>
