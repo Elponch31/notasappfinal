@@ -3,8 +3,6 @@ package com.example.notasapp
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.media.MediaPlayer
-import android.media.MediaRecorder
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -22,8 +20,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
-import com.example.notasapp.ui.theme.NoteViewModel
 import java.io.File
+import com.example.notasapp.ui.theme.NoteViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,45 +31,54 @@ fun NewNoteScreen(navController: NavController, vm: NoteViewModel, noteId: Int) 
     val title by vm.title.collectAsState()
     val content by vm.content.collectAsState()
     val currentNote by vm.currentNote.collectAsState()
-    val audioPath by vm.audioPath.collectAsState()
 
-    var recorder: MediaRecorder? by remember { mutableStateOf(null) }
-    var player: MediaPlayer? by remember { mutableStateOf(null) }
+    val audioRecorder = remember { AudioRecorder(context) }
     var isRecording by remember { mutableStateOf(false) }
+    var isPlaying by remember { mutableStateOf(false) }
+    var lastAudioFile by remember { mutableStateOf<File?>(null) }
 
-    val requestPermissionLauncher = rememberLauncherForActivityResult(
+
+
+    // ------------------ Funciones de grabación ------------------
+    fun startOrStopRecording() {
+        if (!isRecording) {
+            val outputFile = File(context.filesDir, "audio_${System.currentTimeMillis()}.m4a")
+            audioRecorder.startRecording(outputFile)
+            lastAudioFile = outputFile
+            isRecording = true
+            Toast.makeText(context, "Grabación iniciada", Toast.LENGTH_SHORT).show()
+        } else {
+            audioRecorder.stopRecording()
+            isRecording = false
+            Toast.makeText(context, "Grabación guardada", Toast.LENGTH_SHORT).show()
+        }
+    }
+// ------------------ Permisos ------------------
+    val recordPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (!granted) Toast.makeText(context, "Permiso denegado", Toast.LENGTH_SHORT).show()
+        if (granted) startOrStopRecording()
+        else Toast.makeText(context, "Permiso de micrófono denegado", Toast.LENGTH_SHORT).show()
     }
 
-    LaunchedEffect(noteId) {
-        vm.loadNoteById(noteId)
-    }
-
-    fun checkPermissionAndRecord() {
-        val permission = Manifest.permission.RECORD_AUDIO
-        if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED) {
-
-            if (!isRecording) {
-                startRecording(context) { rec, path ->
-                    recorder = rec
-                    vm.audioPath.value = path
-                    isRecording = true
-                }
-            } else {
-                stopRecording(recorder) {
-                    recorder = null
-                    isRecording = false
-                    Toast.makeText(context, "Grabación guardada", Toast.LENGTH_SHORT).show()
-                }
-            }
-
+    fun playAudio() {
+        val file = lastAudioFile ?: return
+        if (isPlaying) {
+            audioRecorder.stopPlayback()
+            isPlaying = false
         } else {
-            requestPermissionLauncher.launch(permission)
+            audioRecorder.play(file) { isPlaying = false }
+            isPlaying = true
         }
     }
 
+    // ------------------ Cargar nota existente ------------------
+    LaunchedEffect(noteId) {
+        vm.loadNoteById(noteId)
+        vm.audioPath.value?.let { lastAudioFile = File(it) }
+    }
+
+    // ------------------ UI ------------------
     Scaffold(
         topBar = {
             TopAppBar(
@@ -86,11 +93,7 @@ fun NewNoteScreen(navController: NavController, vm: NoteViewModel, noteId: Int) 
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(
-                            Icons.Default.ArrowBack,
-                            contentDescription = stringResource(R.string.back),
-                            tint = Color.White
-                        )
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back), tint = Color.White)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF4CAF50))
@@ -101,9 +104,14 @@ fun NewNoteScreen(navController: NavController, vm: NoteViewModel, noteId: Int) 
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-
+                // ------------------ Botón grabar ------------------
                 Button(
-                    onClick = { checkPermissionAndRecord() },
+                    onClick = {
+                        val permission = Manifest.permission.RECORD_AUDIO
+                        if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED)
+                            startOrStopRecording()
+                        else recordPermissionLauncher.launch(permission)
+                    },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0088FF)),
                     modifier = Modifier.fillMaxWidth(0.9f)
                 ) {
@@ -112,47 +120,25 @@ fun NewNoteScreen(navController: NavController, vm: NoteViewModel, noteId: Int) 
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // ▶► REPRODUCIR SI HAY AUDIO
-                if (audioPath != null) {
-                    Button(
-                        onClick = {
-                            player?.stop()
-                            player = MediaPlayer().apply {
-                                setDataSource(audioPath)
-                                prepare()
-                                start()
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF009688)),
-                        modifier = Modifier.fillMaxWidth(0.9f)
-                    ) {
-                        Text("Reproducir audio", color = Color.White)
+                // ------------------ Botón reproducir audio ------------------
+                lastAudioFile?.let { file ->
+                    if (file.exists()) {
+                        Button(
+                            onClick = { playAudio() },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6A1B9A)),
+                            modifier = Modifier.fillMaxWidth(0.9f)
+                        ) {
+                            Text(if (isPlaying) "⏹ Detener Audio" else "▶️ Reproducir Audio", color = Color.White)
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
                     }
-
-                    Spacer(modifier = Modifier.height(12.dp))
                 }
 
-                if (noteId != 0) {
-                    Button(
-                        onClick = {
-                            currentNote?.let {
-                                vm.deleteNote(it)
-                                navController.popBackStack()
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935)),
-                        modifier = Modifier.fillMaxWidth(0.9f)
-                    ) {
-                        Text("Eliminar", color = Color.White)
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-
+                // ------------------ Botón guardar ------------------
                 Button(
                     onClick = {
-                        if (noteId == 0) vm.addNote()
-                        else vm.updateNote(noteId)
+                        vm.audioPath.value = lastAudioFile?.absolutePath
+                        if (noteId == 0) vm.addNote() else vm.updateNote(noteId)
                         navController.popBackStack()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
@@ -164,7 +150,6 @@ fun NewNoteScreen(navController: NavController, vm: NoteViewModel, noteId: Int) 
         }
     ) { padding ->
         Column(modifier = Modifier.padding(padding).padding(16.dp)) {
-
             OutlinedTextField(
                 value = title,
                 onValueChange = { vm.title.value = it },
@@ -183,30 +168,4 @@ fun NewNoteScreen(navController: NavController, vm: NoteViewModel, noteId: Int) 
             )
         }
     }
-}
-
-fun startRecording(context: Context, onStart: (MediaRecorder, String) -> Unit) {
-    val outputFile = File(
-        context.getExternalFilesDir(null),
-        "note_${System.currentTimeMillis()}.3gp"
-    )
-
-    val recorder = MediaRecorder().apply {
-        setAudioSource(MediaRecorder.AudioSource.MIC)
-        setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP)
-        setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB)
-        setOutputFile(outputFile.absolutePath)
-        prepare()
-        start()
-    }
-
-    onStart(recorder, outputFile.absolutePath)
-}
-
-fun stopRecording(recorder: MediaRecorder?, onStop: () -> Unit) {
-    recorder?.apply {
-        stop()
-        release()
-    }
-    onStop()
 }

@@ -1,16 +1,12 @@
 package com.example.notasapp
 
 import android.Manifest
-import android.content.Context
 import android.content.pm.PackageManager
-import android.media.MediaPlayer
-import android.media.MediaRecorder
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,6 +20,12 @@ import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import com.example.notasapp.ui.theme.TaskViewModel
 import java.io.File
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,46 +34,56 @@ fun NewTaskScreen(navController: NavController, vm: TaskViewModel, taskId: Int) 
     val context = LocalContext.current
     val title by vm.title.collectAsState()
     val content by vm.content.collectAsState()
-    val currentTask by vm.currentTask.collectAsState()
-    val audioPath by vm.audioPath.collectAsState()
+    val audioRecorder = remember { AudioRecorder(context) }
 
-    var recorder: MediaRecorder? by remember { mutableStateOf(null) }
-    var player: MediaPlayer? by remember { mutableStateOf(null) }
     var isRecording by remember { mutableStateOf(false) }
+    var isPlaying by remember { mutableStateOf(false) }
+    var lastAudioFile by remember { mutableStateOf<File?>(null) }
 
-    val requestPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (!granted) Toast.makeText(context, "Permiso denegado", Toast.LENGTH_SHORT).show()
-    }
-
-    LaunchedEffect(taskId) {
-        vm.loadTaskById(taskId)
-    }
-
-    fun checkPermissionAndRecord() {
-        val permission = Manifest.permission.RECORD_AUDIO
-        if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED) {
-
-            if (!isRecording) {
-                startRecording(context) { rec, path ->
-                    recorder = rec
-                    vm.audioPath.value = path
-                    isRecording = true
-                }
-            } else {
-                stopRecording(recorder) {
-                    recorder = null
-                    isRecording = false
-                    Toast.makeText(context, "Grabación guardada", Toast.LENGTH_SHORT).show()
-                }
-            }
-
+    // ------------------ Funciones ------------------
+    fun startOrStopRecording() {
+        val outputFile = File(context.filesDir, "audio_${System.currentTimeMillis()}.m4a")
+        if (!isRecording) {
+            audioRecorder.startRecording(outputFile)
+            lastAudioFile = outputFile
+            isRecording = true
+            Toast.makeText(context, "Grabación iniciada", Toast.LENGTH_SHORT).show()
         } else {
-            requestPermissionLauncher.launch(permission)
+            audioRecorder.stopRecording()
+            isRecording = false
+            Toast.makeText(context, "Grabación guardada", Toast.LENGTH_SHORT).show()
         }
     }
 
+    fun playAudio() {
+        val file = lastAudioFile ?: return
+        if (isPlaying) {
+            audioRecorder.stopPlayback()
+            isPlaying = false
+        } else {
+            audioRecorder.play(file) { isPlaying = false }
+            isPlaying = true
+        }
+    }
+
+    // ------------------ Permisos ------------------
+    val recordPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) startOrStopRecording()
+        else Toast.makeText(context, "Permiso de micrófono denegado", Toast.LENGTH_SHORT).show()
+    }
+
+    // ------------------ Cargar tarea ------------------
+    LaunchedEffect(taskId) {
+        vm.loadTaskById(taskId)
+        vm.audioPath.value?.let { path ->
+            val file = File(path)
+            if (file.exists()) lastAudioFile = file
+        }
+    }
+
+    // ------------------ UI ------------------
     Scaffold(
         topBar = {
             TopAppBar(
@@ -87,7 +99,7 @@ fun NewTaskScreen(navController: NavController, vm: TaskViewModel, taskId: Int) 
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(
-                            Icons.Default.ArrowBack,
+                            imageVector = androidx.compose.material.icons.Icons.Default.ArrowBack,
                             contentDescription = stringResource(R.string.back),
                             tint = Color.White
                         )
@@ -97,14 +109,17 @@ fun NewTaskScreen(navController: NavController, vm: TaskViewModel, taskId: Int) 
             )
         },
         bottomBar = {
-
             Column(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-
                 Button(
-                    onClick = { checkPermissionAndRecord() },
+                    onClick = {
+                        val permission = Manifest.permission.RECORD_AUDIO
+                        if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED)
+                            startOrStopRecording()
+                        else recordPermissionLauncher.launch(permission)
+                    },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0088FF)),
                     modifier = Modifier.fillMaxWidth(0.9f)
                 ) {
@@ -113,47 +128,23 @@ fun NewTaskScreen(navController: NavController, vm: TaskViewModel, taskId: Int) 
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // ▶► REPRODUCIR
-                if (audioPath != null) {
-                    Button(
-                        onClick = {
-                            player?.stop()
-                            player = MediaPlayer().apply {
-                                setDataSource(audioPath)
-                                prepare()
-                                start()
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF009688)),
-                        modifier = Modifier.fillMaxWidth(0.9f)
-                    ) {
-                        Text("Reproducir audio", color = Color.White)
+                lastAudioFile?.let { file ->
+                    if (file.exists()) {
+                        Button(
+                            onClick = { playAudio() },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6A1B9A)),
+                            modifier = Modifier.fillMaxWidth(0.9f)
+                        ) {
+                            Text(if (isPlaying) "⏹ Detener Audio" else "▶️ Reproducir Audio", color = Color.White)
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
                     }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-
-                if (taskId != 0) {
-                    Button(
-                        onClick = {
-                            currentTask?.let {
-                                vm.deleteTask(it)
-                                navController.popBackStack()
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935)),
-                        modifier = Modifier.fillMaxWidth(0.9f)
-                    ) {
-                        Text("Eliminar", color = Color.White)
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
                 }
 
                 Button(
                     onClick = {
-                        if (taskId == 0) vm.addTask()
-                        else vm.updateTask(taskId)
+                        vm.audioPath.value = lastAudioFile?.absolutePath
+                        if (taskId == 0) vm.addTask() else vm.updateTask(taskId)
                         navController.popBackStack()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
@@ -165,7 +156,6 @@ fun NewTaskScreen(navController: NavController, vm: TaskViewModel, taskId: Int) 
         }
     ) { padding ->
         Column(modifier = Modifier.padding(padding).padding(16.dp)) {
-
             OutlinedTextField(
                 value = title,
                 onValueChange = { vm.title.value = it },
@@ -185,3 +175,4 @@ fun NewTaskScreen(navController: NavController, vm: TaskViewModel, taskId: Int) 
         }
     }
 }
+

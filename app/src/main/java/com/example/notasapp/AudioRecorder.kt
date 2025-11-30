@@ -14,12 +14,9 @@ class AudioRecorder(private val context: Context) {
     private var player: MediaPlayer? = null
     private val TAG = "AudioRecorder"
 
-    /**
-     * Inicia la grabación de audio de forma segura.
-     */
+    /** Inicia la grabación de audio */
     fun startRecording(outputFile: File) {
         recorder?.release()
-
         recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             MediaRecorder(context)
         } else {
@@ -27,7 +24,6 @@ class AudioRecorder(private val context: Context) {
             MediaRecorder()
         }.apply {
             setAudioSource(MediaRecorder.AudioSource.MIC)
-            // Formato moderno para mejor calidad y compatibilidad
             setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
             setOutputFile(outputFile.absolutePath)
@@ -47,9 +43,7 @@ class AudioRecorder(private val context: Context) {
         }
     }
 
-    /**
-     * Detiene la grabación y libera el MediaRecorder.
-     */
+    /** Detiene la grabación de audio */
     fun stopRecording() {
         recorder?.apply {
             try {
@@ -64,21 +58,21 @@ class AudioRecorder(private val context: Context) {
     }
 
     /**
-     * Inicia la reproducción de un archivo de audio, asegurando la limpieza.
+     * Reproduce un archivo de audio
+     * @param file archivo a reproducir
+     * @param onCompletion callback cuando termina la reproducción
      */
-    fun play(file: File) {
+    fun play(file: File, onCompletion: () -> Unit) {
+        if (!file.exists()) return
         player?.release()
-        player = null
-
         player = MediaPlayer().apply {
             try {
                 setDataSource(file.absolutePath)
                 prepare()
                 start()
-
-                // CRÍTICO: Liberar el recurso al finalizar la reproducción
-                setOnCompletionListener { mp ->
-                    mp.release()
+                setOnCompletionListener {
+                    onCompletion()
+                    release()
                     player = null
                 }
             } catch (e: Exception) {
@@ -89,13 +83,19 @@ class AudioRecorder(private val context: Context) {
         }
     }
 
-    /**
-     * Detiene y libera todos los recursos. ESENCIAL para el cleanup.
-     */
+    /** Detiene solo la reproducción */
+    fun stopPlayback() {
+        player?.apply {
+            if (isPlaying) stop()
+            release()
+        }
+        player = null
+    }
+
+    /** Libera todos los recursos de grabación y reproducción */
     fun releaseAll() {
         recorder?.release()
         recorder = null
-
         player?.release()
         player = null
     }
