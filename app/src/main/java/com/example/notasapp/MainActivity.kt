@@ -28,6 +28,7 @@ class MainActivity : ComponentActivity() {
             NotasAppTheme {
                 val navController: NavHostController = rememberNavController()
 
+                // ViewModels
                 val noteVm: NoteViewModel = viewModel(factory = NoteViewModelFactory(noteRepository))
                 val taskVm: TaskViewModel = viewModel(factory = TaskViewModelFactory(taskRepository))
                 val mediaVm: MediaViewModel = viewModel(factory = MediaViewModelFactory(application = application))
@@ -36,19 +37,21 @@ class MainActivity : ComponentActivity() {
                     navController = navController,
                     startDestination = "notes"
                 ) {
-
+                    // Pantalla principal
                     composable("notes") {
                         NotesScreen(navController, noteVm, taskVm, mediaVm)
                     }
 
+                    // Nueva nota / editar nota
                     composable("new_note/{noteId}") { backStackEntry ->
                         val noteId = backStackEntry.arguments?.getString("noteId")?.toIntOrNull() ?: 0
-                        NewNoteScreen(navController, noteVm, noteId)
+                        NewNoteScreen(navController, noteVm,mediaVm, noteId)
                     }
 
+                    // Nueva tarea / editar tarea
                     composable("new_task/{taskId}") { backStackEntry ->
                         val taskId = backStackEntry.arguments?.getString("taskId")?.toIntOrNull() ?: 0
-                        NewTaskScreen(navController, taskVm, taskId)
+                        NewTaskScreen(navController, taskVm, mediaVm, taskId)
                     }
                 }
             }

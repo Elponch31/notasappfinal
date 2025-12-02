@@ -14,7 +14,7 @@ class AudioRecorder(private val context: Context) {
     private var player: MediaPlayer? = null
     private val TAG = "AudioRecorder"
 
-    /** Inicia la grabación de audio */
+
     fun startRecording(outputFile: File) {
         recorder?.release()
         recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -43,7 +43,7 @@ class AudioRecorder(private val context: Context) {
         }
     }
 
-    /** Detiene la grabación de audio */
+
     fun stopRecording() {
         recorder?.apply {
             try {
@@ -57,11 +57,7 @@ class AudioRecorder(private val context: Context) {
         recorder = null
     }
 
-    /**
-     * Reproduce un archivo de audio
-     * @param file archivo a reproducir
-     * @param onCompletion callback cuando termina la reproducción
-     */
+
     fun play(file: File, onCompletion: () -> Unit) {
         if (!file.exists()) return
         player?.release()
@@ -83,7 +79,7 @@ class AudioRecorder(private val context: Context) {
         }
     }
 
-    /** Detiene solo la reproducción */
+
     fun stopPlayback() {
         player?.apply {
             if (isPlaying) stop()
@@ -92,7 +88,7 @@ class AudioRecorder(private val context: Context) {
         player = null
     }
 
-    /** Libera todos los recursos de grabación y reproducción */
+
     fun releaseAll() {
         recorder?.release()
         recorder = null
