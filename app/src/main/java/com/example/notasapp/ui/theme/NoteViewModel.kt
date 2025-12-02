@@ -76,6 +76,14 @@ class NoteViewModel(private val repository: NoteRepository) : ViewModel() {
             }
         }
     }
+
+
+    fun clearNote() {
+        title.value = ""
+        content.value = ""
+        audioPath.value = null
+        currentNote.value = null
+    }
 }
 
 class NoteViewModelFactory(private val repository: NoteRepository) :

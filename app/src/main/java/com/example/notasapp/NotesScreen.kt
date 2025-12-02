@@ -20,20 +20,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.notasapp.media.PhotosScreen
-
 import androidx.compose.ui.unit.sp
-
 import androidx.navigation.NavController
 import com.example.notasapp.media.MediaViewModel
-import com.example.notasapp.media.MediaEntity
+import com.example.notasapp.media.PhotosScreen
 import com.example.notasapp.ui.theme.NoteViewModel
 import com.example.notasapp.ui.theme.TaskViewModel
-
-
-
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -44,7 +37,6 @@ fun NotesScreen(
     taskVm: TaskViewModel,
     mediaVm: MediaViewModel
 ) {
-    // 0 = Notas/Tareas, 1 = Fotos/Videos
     var selectedSection by remember { mutableStateOf(0) }
     var selectedTab by remember { mutableStateOf(0) }
 
@@ -75,7 +67,7 @@ fun NotesScreen(
             // ---------------- PANEL LATERAL ----------------
             Column(
                 modifier = Modifier
-                    .width(75.dp)   // reducido
+                    .width(75.dp)
                     .fillMaxHeight()
                     .padding(6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -85,7 +77,7 @@ fun NotesScreen(
                     onClick = { selectedSection = 0 },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(40.dp),  // un poquito más alto para que el texto quepa bien
+                        .height(40.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor =
                             if (selectedSection == 0) Color(0xFF81C784)
@@ -112,9 +104,6 @@ fun NotesScreen(
                 }
             }
 
-
-
-
             // ---------------- CONTENIDO DERECHA ----------------
             Box(
                 modifier = Modifier
@@ -123,22 +112,13 @@ fun NotesScreen(
             ) {
                 when (selectedSection) {
 
-                    // --------------------------------------------------------
-                    // ----------- SECCIÓN ORIGINAL: NOTAS / TAREAS ----------
-                    // --------------------------------------------------------
+                    // ---------------- NOTAS / TAREAS ----------------
                     0 -> {
 
-                        BoxWithConstraints(
-                            modifier = Modifier.fillMaxSize()
-                        ) {
+                        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
 
-                            // ——————————————————————————
-                            //  PANTALLA PEQUEÑA (MÓVILES)
-                            // ——————————————————————————
                             if (maxWidth < 800.dp) {
-
                                 Column {
-
                                     val tabs = listOf(
                                         stringResource(R.string.notes),
                                         stringResource(R.string.tasks)
@@ -156,17 +136,14 @@ fun NotesScreen(
 
                                     Spacer(modifier = Modifier.height(12.dp))
 
-                                    if (selectedTab == 0) {
-                                        NotesList(navController, noteVm)
-                                    } else {
-                                        TasksList(navController = navController, taskVm = taskVm)
-
-
-                                    }
+                                    if (selectedTab == 0) NotesList(navController, noteVm)
+                                    else TasksList(navController = navController, taskVm = taskVm)
                                 }
 
                                 FloatingActionButton(
                                     onClick = {
+                                        if (selectedTab == 0) noteVm.clearNote()
+                                        else taskVm.clearTask()
                                         if (selectedTab == 0)
                                             navController.navigate("new_note/0")
                                         else
@@ -179,33 +156,29 @@ fun NotesScreen(
                                 ) {
                                     Icon(Icons.Default.Add, "Agregar", tint = Color.White)
                                 }
-                            }
-
-                            // ——————————————————————————
-                            //  PANTALLA GRANDE (TABLET)
-                            // ——————————————————————————
-                            else {
+                            } else {
 
                                 Column(
                                     modifier = Modifier.fillMaxSize(),
                                     verticalArrangement = Arrangement.spacedBy(32.dp)
                                 ) {
 
-                                    // ——— NOTAS ———
+                                    // Notas
                                     Box(modifier = Modifier.weight(1f)) {
                                         Column(modifier = Modifier.fillMaxSize()) {
-
                                             Text(
                                                 text = stringResource(R.string.notes),
                                                 style = MaterialTheme.typography.titleLarge,
                                                 modifier = Modifier.padding(bottom = 8.dp)
                                             )
-
                                             NotesList(navController, noteVm)
                                         }
 
                                         FloatingActionButton(
-                                            onClick = { navController.navigate("new_note/0") },
+                                            onClick = {
+                                                noteVm.clearNote()
+                                                navController.navigate("new_note/0")
+                                            },
                                             containerColor = Color(0xFF4CAF50),
                                             modifier = Modifier
                                                 .align(Alignment.BottomEnd)
@@ -215,23 +188,22 @@ fun NotesScreen(
                                         }
                                     }
 
-                                    // ——— TAREAS ———
+                                    // Tareas
                                     Box(modifier = Modifier.weight(1f)) {
                                         Column(modifier = Modifier.fillMaxSize()) {
-
                                             Text(
                                                 text = stringResource(R.string.tasks),
                                                 style = MaterialTheme.typography.titleLarge,
                                                 modifier = Modifier.padding(bottom = 8.dp)
                                             )
-
                                             TasksList(navController = navController, taskVm = taskVm)
-
-
                                         }
 
                                         FloatingActionButton(
-                                            onClick = { navController.navigate("new_task/0") },
+                                            onClick = {
+                                                taskVm.clearTask()
+                                                navController.navigate("new_task/0")
+                                            },
                                             containerColor = Color(0xFF4CAF50),
                                             modifier = Modifier
                                                 .align(Alignment.BottomEnd)
@@ -245,9 +217,7 @@ fun NotesScreen(
                         }
                     }
 
-                    // --------------------------------------------------------
-                    // ---------------- SECCIÓN FOTOS / VIDEOS ----------------
-                    // --------------------------------------------------------
+                    // ---------------- FOTOS / VIDEOS ----------------
                     1 -> {
                         PhotosScreen(mediaVm)
                     }
@@ -257,11 +227,7 @@ fun NotesScreen(
     }
 }
 
-// ------------------------------------------------------------
-// ----------------- LISTA DE NOTAS ---------------------------
-// ------------------------------------------------------------
-
-
+// ----------------- LISTA DE NOTAS -----------------
 @Composable
 fun NotesList(navController: NavController, noteVm: NoteViewModel) {
     val notes by noteVm.notes.collectAsState()
@@ -271,7 +237,6 @@ fun NotesList(navController: NavController, noteVm: NoteViewModel) {
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         items(notes) { note ->
-
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -320,23 +285,18 @@ fun NotesList(navController: NavController, noteVm: NoteViewModel) {
     }
 }
 
-
-// ------------------------------------------------------------
-// ----------------- LISTA DE TAREAS --------------------------
-// ------------------------------------------------------------
+// ----------------- LISTA DE TAREAS -----------------
 @Composable
 fun TasksList(navController: NavController, taskVm: TaskViewModel) {
     val tasks by taskVm.tasks.collectAsState()
     val context = LocalContext.current
-    val audioRecorder = remember { AudioRecorder(context) } // Una sola instancia
+    val audioRecorder = remember { AudioRecorder(context) }
     var playingTaskId by remember { mutableStateOf<Int?>(null) }
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         items(tasks) { task ->
-
             Card(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
                 Column(modifier = Modifier.padding(16.dp)) {
-
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(
                             modifier = Modifier
@@ -374,11 +334,3 @@ fun TasksList(navController: NavController, taskVm: TaskViewModel) {
         }
     }
 }
-
-
-
-
-
-
-
-

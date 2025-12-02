@@ -17,6 +17,7 @@ class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
     val title = MutableStateFlow("")
     val content = MutableStateFlow("")
     val audioPath = MutableStateFlow<String?>(null)
+    val dueDate = MutableStateFlow<Long?>(null)
     val currentTask = MutableStateFlow<Task?>(null)
 
     init {
@@ -35,7 +36,7 @@ class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
                 Task(
                     title = title.value,
                     content = content.value,
-                    audioPath = audioPath.value
+                    audioPath = audioPath.value,
                 )
             )
             loadTasks()
@@ -49,7 +50,7 @@ class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
                     id = id,
                     title = title.value,
                     content = content.value,
-                    audioPath = audioPath.value
+                    audioPath = audioPath.value,
                 )
             )
             loadTasks()
@@ -75,6 +76,15 @@ class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
                 }
             }
         }
+    }
+
+
+    fun clearTask() {
+        title.value = ""
+        content.value = ""
+        audioPath.value = null
+        dueDate.value = null
+        currentTask.value = null
     }
 }
 

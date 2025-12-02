@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import android.util.Size
+import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -22,9 +23,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import kotlinx.coroutines.launch
-import android.Manifest
 
 // ------------------ FUNCIÓN PARA CARGAR MINIATURAS ------------------
 fun loadThumbnail(context: Context, uri: Uri, isVideo: Boolean): Bitmap? {
@@ -61,7 +60,6 @@ fun PhotosScreen(mediaVm: MediaViewModel) {
     var pendingPhotoUri by remember { mutableStateOf<Uri?>(null) }
     var pendingVideoUri by remember { mutableStateOf<Uri?>(null) }
 
-    // ------------------ LAUNCHERS ------------------
     val takePictureLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicture()
     ) { success ->
@@ -80,7 +78,7 @@ fun PhotosScreen(mediaVm: MediaViewModel) {
         ActivityResultContracts.RequestMultiplePermissions()
     ) { result ->
         val cameraGranted = result[Manifest.permission.CAMERA] ?: false
-        val audioGranted = result[Manifest.permission.RECORD_AUDIO] ?: true // opcional si no grabas audio
+        val audioGranted = result[Manifest.permission.RECORD_AUDIO] ?: true
         val readImagesGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
             result[Manifest.permission.READ_MEDIA_IMAGES] ?: false else true
         val readVideosGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
@@ -92,7 +90,6 @@ fun PhotosScreen(mediaVm: MediaViewModel) {
         }
     }
 
-    // ------------------ CREAR URI ------------------
     fun createImageUri(): Uri? {
         val values = ContentValues().apply {
             put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
@@ -115,7 +112,6 @@ fun PhotosScreen(mediaVm: MediaViewModel) {
         return context.contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
     }
 
-    // ------------------ SOLICITAR PERMISOS ------------------
     fun requestPermissions() {
         val permissions = mutableListOf<String>()
         permissions.add(Manifest.permission.CAMERA)
@@ -130,9 +126,9 @@ fun PhotosScreen(mediaVm: MediaViewModel) {
     }
 
     // ------------------ UI ------------------
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
         Text("Fotos y Videos", style = MaterialTheme.typography.titleLarge)
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         LazyColumn(modifier = Modifier.weight(1f)) {
             items(mediaList) { media ->
@@ -146,25 +142,35 @@ fun PhotosScreen(mediaVm: MediaViewModel) {
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            // ---------------- FOTO ----------------
-            FloatingActionButton(onClick = {
-                pendingPhotoUri = createImageUri()
-                requestPermissions()
-            }) { Text("+ Foto", fontSize = 12.sp) }
+            FloatingActionButton(
+                onClick = {
+                    pendingPhotoUri = createImageUri()
+                    requestPermissions()
+                },
+                modifier = Modifier.height(48.dp)
+            ) {
+                Text("📷 Foto", fontSize = 14.sp)
+            }
 
-            // ---------------- VIDEO ----------------
-            FloatingActionButton(onClick = {
-                pendingVideoUri = createVideoUri()
-                requestPermissions()
-            }) { Text("+ Video", fontSize = 12.sp) }
+            Spacer(modifier = Modifier.width(8.dp))
+
+            FloatingActionButton(
+                onClick = {
+                    pendingVideoUri = createVideoUri()
+                    requestPermissions()
+                },
+                modifier = Modifier.height(48.dp)
+            ) {
+                Text("🎥 Video", fontSize = 14.sp)
+            }
         }
     }
 }
 
-// ------------------ MEDIA ROW ------------------
+// ------------------ MEDIA ROW COMPACTA ------------------
 @Composable
 fun MediaRow(media: MediaEntity, onDelete: (MediaEntity) -> Unit) {
     val context = LocalContext.current
@@ -178,29 +184,36 @@ fun MediaRow(media: MediaEntity, onDelete: (MediaEntity) -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        elevation = CardDefaults.cardElevation(4.dp)
+            .height(80.dp)
+            .padding(vertical = 4.dp),
+        elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Row(
             modifier = Modifier.padding(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (bitmap != null) {
-                Image(bitmap = bitmap!!.asImageBitmap(), contentDescription = null, modifier = Modifier.size(84.dp))
+                Image(
+                    bitmap = bitmap!!.asImageBitmap(),
+                    contentDescription = null,
+                    modifier = Modifier.size(60.dp)
+                )
             } else {
-                Box(modifier = Modifier.size(84.dp), contentAlignment = Alignment.Center) {
-                    Text("Cargando")
+                Box(modifier = Modifier.size(60.dp), contentAlignment = Alignment.Center) {
+                    Text("Cargando", fontSize = 10.sp)
                 }
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(8.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(if (media.type == "video") "Video" else "Foto")
-
+                Text(if (media.type == "video") "Video" else "Foto", fontSize = 14.sp)
             }
 
-            Button(onClick = { onDelete(media) }) { Text("Eliminar") }
+            Button(
+                onClick = { onDelete(media) },
+                modifier = Modifier.height(36.dp)
+            ) { Text("Eliminar", fontSize = 12.sp) }
         }
     }
 }

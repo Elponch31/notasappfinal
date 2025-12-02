@@ -5,7 +5,6 @@ import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -13,11 +12,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
+import com.example.notasapp.media.MediaViewModel
+import com.example.notasapp.media.PhotosScreen
 import com.example.notasapp.ui.theme.TaskViewModel
 import java.io.File
 import androidx.compose.material3.Icon
@@ -29,8 +29,12 @@ import androidx.compose.material.icons.filled.ArrowBack
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NewTaskScreen(navController: NavController, vm: TaskViewModel, taskId: Int) {
-
+fun NewTaskScreen(
+    navController: NavController,
+    vm: TaskViewModel,
+    mediaVm: MediaViewModel,
+    taskId: Int
+) {
     val context = LocalContext.current
     val title by vm.title.collectAsState()
     val content by vm.content.collectAsState()
@@ -40,7 +44,6 @@ fun NewTaskScreen(navController: NavController, vm: TaskViewModel, taskId: Int) 
     var isPlaying by remember { mutableStateOf(false) }
     var lastAudioFile by remember { mutableStateOf<File?>(null) }
 
-    // ------------------ Funciones ------------------
     fun startOrStopRecording() {
         val outputFile = File(context.filesDir, "audio_${System.currentTimeMillis()}.m4a")
         if (!isRecording) {
@@ -66,7 +69,6 @@ fun NewTaskScreen(navController: NavController, vm: TaskViewModel, taskId: Int) 
         }
     }
 
-    // ------------------ Permisos ------------------
     val recordPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -74,7 +76,6 @@ fun NewTaskScreen(navController: NavController, vm: TaskViewModel, taskId: Int) 
         else Toast.makeText(context, "Permiso de micrófono denegado", Toast.LENGTH_SHORT).show()
     }
 
-    // ------------------ Cargar tarea ------------------
     LaunchedEffect(taskId) {
         vm.loadTaskById(taskId)
         vm.audioPath.value?.let { path ->
@@ -83,14 +84,12 @@ fun NewTaskScreen(navController: NavController, vm: TaskViewModel, taskId: Int) 
         }
     }
 
-    // ------------------ UI ------------------
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        if (taskId == 0) stringResource(R.string.new_task)
-                        else stringResource(R.string.edit_task),
+                        if (taskId == 0) "Nueva tarea" else "Editar tarea",
                         modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Center,
                         color = Color.White
@@ -99,8 +98,8 @@ fun NewTaskScreen(navController: NavController, vm: TaskViewModel, taskId: Int) 
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(
-                            imageVector = androidx.compose.material.icons.Icons.Default.ArrowBack,
-                            contentDescription = stringResource(R.string.back),
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Atrás",
                             tint = Color.White
                         )
                     }
@@ -110,37 +109,12 @@ fun NewTaskScreen(navController: NavController, vm: TaskViewModel, taskId: Int) 
         },
         bottomBar = {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp)
+                    .padding(bottom = 16.dp), // Reducimos el padding inferior para subir el botón
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Button(
-                    onClick = {
-                        val permission = Manifest.permission.RECORD_AUDIO
-                        if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED)
-                            startOrStopRecording()
-                        else recordPermissionLauncher.launch(permission)
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0088FF)),
-                    modifier = Modifier.fillMaxWidth(0.9f)
-                ) {
-                    Text(if (isRecording) "Detener grabación" else "Grabar audio", color = Color.White)
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                lastAudioFile?.let { file ->
-                    if (file.exists()) {
-                        Button(
-                            onClick = { playAudio() },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6A1B9A)),
-                            modifier = Modifier.fillMaxWidth(0.9f)
-                        ) {
-                            Text(if (isPlaying) "⏹ Detener Audio" else "▶️ Reproducir Audio", color = Color.White)
-                        }
-                        Spacer(modifier = Modifier.height(12.dp))
-                    }
-                }
-
                 Button(
                     onClick = {
                         vm.audioPath.value = lastAudioFile?.absolutePath
@@ -148,31 +122,109 @@ fun NewTaskScreen(navController: NavController, vm: TaskViewModel, taskId: Int) 
                         navController.popBackStack()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-                    modifier = Modifier.fillMaxWidth(0.9f)
+                    modifier = Modifier
+                        .fillMaxWidth(0.7f)
+                        .height(50.dp)
                 ) {
-                    Text("Guardar", color = Color.White)
+                    Text(
+                        "Guardar tarea",
+                        color = Color.White,
+                        fontSize = MaterialTheme.typography.labelLarge.fontSize
+                    )
                 }
             }
         }
     ) { padding ->
-        Column(modifier = Modifier.padding(padding).padding(16.dp)) {
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .padding(8.dp)
+        ) {
+
+            // ---------------- Título ----------------
             OutlinedTextField(
                 value = title,
                 onValueChange = { vm.title.value = it },
-                label = { Text(stringResource(R.string.title)) },
+                label = { Text("Título") },
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
+            // ---------------- Contenido ----------------
             OutlinedTextField(
                 value = content,
                 onValueChange = { vm.content.value = it },
-                label = { Text(stringResource(R.string.content)) },
+                label = { Text("Contenido") },
                 modifier = Modifier.fillMaxWidth(),
-                maxLines = 5
+                maxLines = 4
             )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // ---------------- Fotos y videos ----------------
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(300.dp)
+            ) {
+                PhotosScreen(mediaVm)
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // ---------------- Grabación de audio ----------------
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+
+                // Botón Grabar
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Button(
+                        onClick = {
+                            val permission = Manifest.permission.RECORD_AUDIO
+                            if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED)
+                                startOrStopRecording()
+                            else recordPermissionLauncher.launch(permission)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0088FF)),
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .fillMaxWidth(0.7f)
+                            .height(36.dp)
+                    ) {
+                        Text(
+                            if (isRecording) "Detener" else "Grabar",
+                            color = Color.White,
+                            fontSize = MaterialTheme.typography.labelLarge.fontSize
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Botón Reproducir
+                lastAudioFile?.let { file ->
+                    if (file.exists()) {
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            Button(
+                                onClick = { playAudio() },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6A1B9A)),
+                                modifier = Modifier
+                                    .align(Alignment.Center)
+                                    .fillMaxWidth(0.7f)
+                                    .height(36.dp)
+                            ) {
+                                Text(
+                                    if (isPlaying) "⏹ Detener" else "▶ Reproducir",
+                                    color = Color.White,
+                                    fontSize = MaterialTheme.typography.labelLarge.fontSize
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
+            }
         }
     }
 }
-
