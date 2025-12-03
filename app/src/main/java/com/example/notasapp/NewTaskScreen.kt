@@ -1,10 +1,13 @@
 package com.example.notasapp
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,6 +29,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,6 +47,15 @@ fun NewTaskScreen(
     var isRecording by remember { mutableStateOf(false) }
     var isPlaying by remember { mutableStateOf(false) }
     var lastAudioFile by remember { mutableStateOf<File?>(null) }
+
+    // ------------------- Archivos adjuntos -------------------
+    val attachedFiles = vm.attachedFiles
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { vm.addAttachedFile(it) }
+    }
+    // ----------------------------------------------------------
 
     fun startOrStopRecording() {
         val outputFile = File(context.filesDir, "audio_${System.currentTimeMillis()}.m4a")
@@ -112,7 +125,7 @@ fun NewTaskScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 8.dp)
-                    .padding(bottom = 16.dp), // Reducimos el padding inferior para subir el botón
+                    .padding(bottom = 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Button(
@@ -140,7 +153,6 @@ fun NewTaskScreen(
                 .padding(padding)
                 .padding(8.dp)
         ) {
-
             // ---------------- Título ----------------
             OutlinedTextField(
                 value = title,
@@ -159,6 +171,54 @@ fun NewTaskScreen(
                 modifier = Modifier.fillMaxWidth(),
                 maxLines = 4
             )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // ---------------- Botón para adjuntar archivos ----------------
+            Button(
+                onClick = { filePickerLauncher.launch("*/*") },
+                modifier = Modifier
+                    .fillMaxWidth(0.7f)
+                    .align(Alignment.CenterHorizontally)
+            ) {
+                Text("Adjuntar archivo")
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // ---------------- Lista de archivos adjuntos ----------------
+            attachedFiles.forEach { uri ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Abrir archivo al click
+                    Text(
+                        text = uri.lastPathSegment ?: "Archivo seleccionado",
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable {
+                                val intent = Intent(Intent.ACTION_VIEW).apply {
+                                    setDataAndType(uri, context.contentResolver.getType(uri))
+                                    flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                }
+                                context.startActivity(intent)
+                            }
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // Botón eliminar
+                    IconButton(onClick = { vm.removeAttachedFile(uri) }) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Eliminar archivo"
+                        )
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(8.dp))
 

@@ -12,14 +12,15 @@ import kotlinx.coroutines.launch
 
 class MediaViewModel(application: Application, private val repository: MediaRepository) : AndroidViewModel(application) {
 
-    // Exponemos la lista como StateFlow (similar a tus otros VMs)
     val mediaList = repository.getAll().stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    fun insertUri(uriString: String) {
+    // ---- ÚNICO CAMBIO: AGREGAR type ----
+    fun insertUri(uriString: String, type: String) {
         viewModelScope.launch {
-            repository.insert(MediaEntity(uri = uriString))
+            repository.insert(MediaEntity(uri = uriString, type = type))
         }
     }
+    // -------------------------------------
 
     fun delete(media: MediaEntity) {
         viewModelScope.launch {
@@ -34,7 +35,6 @@ class MediaViewModel(application: Application, private val repository: MediaRepo
     }
 }
 
-// Factory para crear MediaViewModel desde Activity (igual a tus otros factories)
 class MediaViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {

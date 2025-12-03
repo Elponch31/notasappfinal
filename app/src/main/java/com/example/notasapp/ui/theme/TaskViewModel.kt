@@ -1,5 +1,6 @@
 package com.example.notasapp.ui.theme
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -8,6 +9,8 @@ import com.example.notasapp.TaskRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+
+import androidx.compose.runtime.mutableStateListOf
 
 class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
 
@@ -19,6 +22,9 @@ class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
     val audioPath = MutableStateFlow<String?>(null)
     val dueDate = MutableStateFlow<Long?>(null)
     val currentTask = MutableStateFlow<Task?>(null)
+
+    // ---------------- Archivos adjuntos ----------------
+    val attachedFiles = mutableStateListOf<Uri>()
 
     init {
         loadTasks()
@@ -73,11 +79,13 @@ class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
                     title.value = it.title
                     content.value = it.content
                     audioPath.value = it.audioPath
+                    attachedFiles.clear()
+                    // TODO: Si guardas los archivos de la tarea en DB o almacenamiento interno,
+                    // aquí los puedes cargar en attachedFiles
                 }
             }
         }
     }
-
 
     fun clearTask() {
         title.value = ""
@@ -85,6 +93,16 @@ class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
         audioPath.value = null
         dueDate.value = null
         currentTask.value = null
+        attachedFiles.clear()
+    }
+
+    // ---------------- Funciones para archivos adjuntos ----------------
+    fun addAttachedFile(uri: Uri) {
+        attachedFiles.add(uri)
+    }
+
+    fun removeAttachedFile(uri: Uri) {
+        attachedFiles.remove(uri)
     }
 }
 

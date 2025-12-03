@@ -24,8 +24,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.clickable
 
-// ------------------ FUNCIÓN PARA CARGAR MINIATURAS ------------------
+
 fun loadThumbnail(context: Context, uri: Uri, isVideo: Boolean): Bitmap? {
     return try {
         if (isVideo) {
@@ -50,7 +51,6 @@ fun loadThumbnail(context: Context, uri: Uri, isVideo: Boolean): Bitmap? {
     }
 }
 
-// ------------------ PHOTOS SCREEN ------------------
 @Composable
 fun PhotosScreen(mediaVm: MediaViewModel) {
     val context = LocalContext.current
@@ -63,14 +63,16 @@ fun PhotosScreen(mediaVm: MediaViewModel) {
     val takePictureLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicture()
     ) { success ->
-        if (success) pendingPhotoUri?.let { mediaVm.insertUri(it.toString()) }
+        if (success)
+            pendingPhotoUri?.let { mediaVm.insertUri(it.toString(), "image") }  // ← CAMBIO
         pendingPhotoUri = null
     }
 
     val takeVideoLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CaptureVideo()
     ) { success ->
-        if (success) pendingVideoUri?.let { mediaVm.insertUri(it.toString()) }
+        if (success)
+            pendingVideoUri?.let { mediaVm.insertUri(it.toString(), "video") }  // ← CAMBIO
         pendingVideoUri = null
     }
 
@@ -125,7 +127,6 @@ fun PhotosScreen(mediaVm: MediaViewModel) {
         permissionLauncher.launch(permissions.toTypedArray())
     }
 
-    // ------------------ UI ------------------
     Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
         Text("Fotos y Videos", style = MaterialTheme.typography.titleLarge)
         Spacer(modifier = Modifier.height(8.dp))
@@ -170,7 +171,6 @@ fun PhotosScreen(mediaVm: MediaViewModel) {
     }
 }
 
-// ------------------ MEDIA ROW COMPACTA ------------------
 @Composable
 fun MediaRow(media: MediaEntity, onDelete: (MediaEntity) -> Unit) {
     val context = LocalContext.current
@@ -185,7 +185,8 @@ fun MediaRow(media: MediaEntity, onDelete: (MediaEntity) -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .height(80.dp)
-            .padding(vertical = 4.dp),
+            .padding(vertical = 4.dp)
+            .clickable { openMedia(context, media) },   // ← AGREGADO
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Row(
@@ -217,3 +218,24 @@ fun MediaRow(media: MediaEntity, onDelete: (MediaEntity) -> Unit) {
         }
     }
 }
+fun openMedia(context: Context, media: MediaEntity) {
+    try {
+        val uri = Uri.parse(media.uri)
+
+        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+            setDataAndType(
+                uri,
+                if (media.type == "video") "video/*" else "image/*"
+            )
+            flags = android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+
+        context.startActivity(intent)
+
+    } catch (e: Exception) {
+        e.printStackTrace()
+        android.widget.Toast.makeText(context, "No se pudo abrir el archivo", android.widget.Toast.LENGTH_SHORT).show()
+    }
+}
+
