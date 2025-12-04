@@ -7,6 +7,6 @@ import androidx.room.PrimaryKey
 data class MediaEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val uri: String,
-    val type: String = "image", // por si agregas video después
+    val type: String = "image",
     val createdAt: Long = System.currentTimeMillis()
 )

@@ -9,8 +9,8 @@ import com.example.notasapp.TaskRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-
 import androidx.compose.runtime.mutableStateListOf
+import org.json.JSONArray
 
 class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
 
@@ -20,11 +20,24 @@ class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
     val title = MutableStateFlow("")
     val content = MutableStateFlow("")
     val audioPath = MutableStateFlow<String?>(null)
-    val dueDate = MutableStateFlow<Long?>(null)
     val currentTask = MutableStateFlow<Task?>(null)
 
-    // ---------------- Archivos adjuntos ----------------
     val attachedFiles = mutableStateListOf<Uri>()
+
+    private val _reminders = MutableStateFlow<List<Long>>(emptyList())
+    val reminders: StateFlow<List<Long>> get() = _reminders
+
+    fun addReminder(time: Long) {
+        _reminders.value = _reminders.value + time
+    }
+
+    fun removeReminder(time: Long) {
+        _reminders.value = _reminders.value.filter { it != time }
+    }
+
+    fun clearReminders() {
+        _reminders.value = emptyList()
+    }
 
     init {
         loadTasks()
@@ -38,11 +51,17 @@ class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
 
     fun addTask() {
         viewModelScope.launch {
+
+            val remindersJson = JSONArray().apply {
+                _reminders.value.forEach { put(it) }
+            }.toString()
+
             repository.insert(
                 Task(
                     title = title.value,
                     content = content.value,
                     audioPath = audioPath.value,
+                    reminders = remindersJson
                 )
             )
             loadTasks()
@@ -51,12 +70,18 @@ class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
 
     fun updateTask(id: Int) {
         viewModelScope.launch {
+
+            val remindersJson = JSONArray().apply {
+                _reminders.value.forEach { put(it) }
+            }.toString()
+
             repository.update(
                 Task(
                     id = id,
                     title = title.value,
                     content = content.value,
                     audioPath = audioPath.value,
+                    reminders = remindersJson
                 )
             )
             loadTasks()
@@ -72,6 +97,7 @@ class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
 
     fun loadTaskById(id: Int) {
         viewModelScope.launch {
+
             if (id != 0) {
                 val task = repository.getById(id)
                 task?.let {
@@ -79,9 +105,18 @@ class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
                     title.value = it.title
                     content.value = it.content
                     audioPath.value = it.audioPath
+
+                    clearReminders()
+                    it.reminders?.let { json ->
+                        val arr = JSONArray(json)
+                        val list = mutableListOf<Long>()
+                        for (i in 0 until arr.length()) {
+                            list.add(arr.getLong(i))
+                        }
+                        _reminders.value = list
+                    }
+
                     attachedFiles.clear()
-                    // TODO: Si guardas los archivos de la tarea en DB o almacenamiento interno,
-                    // aquí los puedes cargar en attachedFiles
                 }
             }
         }
@@ -91,12 +126,12 @@ class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
         title.value = ""
         content.value = ""
         audioPath.value = null
-        dueDate.value = null
         currentTask.value = null
+
         attachedFiles.clear()
+        clearReminders()
     }
 
-    // ---------------- Funciones para archivos adjuntos ----------------
     fun addAttachedFile(uri: Uri) {
         attachedFiles.add(uri)
     }

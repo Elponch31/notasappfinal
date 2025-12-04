@@ -1,6 +1,8 @@
 package com.example.notasapp
 
 import android.Manifest
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -26,6 +28,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import org.json.JSONArray
+import java.text.SimpleDateFormat
+import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,7 +49,57 @@ fun NewNoteScreen(
     var isPlaying by remember { mutableStateOf(false) }
     var lastAudioFile by remember { mutableStateOf<File?>(null) }
 
-    // ------------------ Funciones de grabación ------------------
+    // -----------------------------------------
+    //      RECORDATORIOS (NUEVO)
+    // -----------------------------------------
+    val reminders = remember { mutableStateListOf<Long>() }
+
+    // Si la nota ya existe, cargamos sus recordatorios
+    LaunchedEffect(noteId) {
+        vm.loadNoteById(noteId)
+        vm.audioPath.value?.let { path ->
+            val file = File(path)
+            if (file.exists()) lastAudioFile = file
+        }
+
+        vm.remindersJson.value?.let { json ->
+            val arr = JSONArray(json)
+            for (i in 0 until arr.length()) {
+                reminders.add(arr.getLong(i))
+            }
+        }
+    }
+
+    fun addReminder() {
+        val now = Calendar.getInstance()
+
+        DatePickerDialog(
+            context,
+            { _, y, m, d ->
+                TimePickerDialog(
+                    context,
+                    { _, h, min ->
+                        val cal = Calendar.getInstance()
+                        cal.set(y, m, d, h, min, 0)
+
+                        reminders.add(cal.timeInMillis)
+                        Toast.makeText(context, "Recordatorio añadido", Toast.LENGTH_SHORT).show()
+
+                    },
+                    now.get(Calendar.HOUR_OF_DAY),
+                    now.get(Calendar.MINUTE),
+                    true
+                ).show()
+            },
+            now.get(Calendar.YEAR),
+            now.get(Calendar.MONTH),
+            now.get(Calendar.DAY_OF_MONTH)
+        ).show()
+    }
+
+    // -----------------------------------------
+    //      AUDIO
+    // -----------------------------------------
     fun startOrStopRecording() {
         val outputFile = File(context.filesDir, "audio_${System.currentTimeMillis()}.m4a")
         if (!isRecording) {
@@ -70,7 +125,6 @@ fun NewNoteScreen(
         }
     }
 
-    // ------------------ Permisos ------------------
     val recordPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -78,16 +132,6 @@ fun NewNoteScreen(
         else Toast.makeText(context, "Permiso de micrófono denegado", Toast.LENGTH_SHORT).show()
     }
 
-    // ------------------ Cargar nota existente ------------------
-    LaunchedEffect(noteId) {
-        vm.loadNoteById(noteId)
-        vm.audioPath.value?.let { path ->
-            val file = File(path)
-            if (file.exists()) lastAudioFile = file
-        }
-    }
-
-    // ------------------ UI ------------------
     Scaffold(
         topBar = {
             TopAppBar(
@@ -111,14 +155,24 @@ fun NewNoteScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp)
-                    .padding(bottom = 16.dp),
+                    .padding(8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+
                 Button(
                     onClick = {
                         vm.audioPath.value = lastAudioFile?.absolutePath
+
+                        val json = JSONArray()
+                        reminders.forEach { json.put(it) }
+                        vm.remindersJson.value = json.toString()
+
                         if (noteId == 0) vm.addNote() else vm.updateNote(noteId)
+
+                        reminders.forEach { time ->
+                            AlarmHelper.programReminder(context, time, title)
+                        }
+
                         navController.popBackStack()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
@@ -126,11 +180,7 @@ fun NewNoteScreen(
                         .fillMaxWidth(0.7f)
                         .height(50.dp)
                 ) {
-                    Text(
-                        "Guardar nota",
-                        color = Color.White,
-                        fontSize = MaterialTheme.typography.labelLarge.fontSize
-                    )
+                    Text("Guardar nota", color = Color.White)
                 }
             }
         }
@@ -141,7 +191,6 @@ fun NewNoteScreen(
                 .padding(8.dp)
         ) {
 
-            // ---------------- Título ----------------
             OutlinedTextField(
                 value = title,
                 onValueChange = { vm.title.value = it },
@@ -151,7 +200,6 @@ fun NewNoteScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // ---------------- Contenido ----------------
             OutlinedTextField(
                 value = content,
                 onValueChange = { vm.content.value = it },
@@ -162,7 +210,7 @@ fun NewNoteScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // ---------------- Fotos y videos ----------------
+            // Fotos
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -173,55 +221,59 @@ fun NewNoteScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // ---------------- Grabación de audio ----------------
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            // ---------------- RECORDATORIOS (UI) ----------------
+            Text("Recordatorios:", style = MaterialTheme.typography.titleMedium)
 
-                // Botón Grabar
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    Button(
-                        onClick = {
-                            val permission = Manifest.permission.RECORD_AUDIO
-                            if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED)
-                                startOrStopRecording()
-                            else recordPermissionLauncher.launch(permission)
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0088FF)),
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .fillMaxWidth(0.7f)
-                            .height(36.dp)
-                    ) {
-                        Text(
-                            if (isRecording) "Detener" else "Grabar",
-                            color = Color.White,
-                            fontSize = MaterialTheme.typography.labelLarge.fontSize
-                        )
-                    }
+            reminders.forEach { r ->
+                Text("⏰ " + SimpleDateFormat("dd/MM/yyyy HH:mm").format(r))
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Button(
+                onClick = { addReminder() },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Añadir recordatorio", color = Color.White)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Grabación de audio
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Button(
+                    onClick = {
+                        val permission = Manifest.permission.RECORD_AUDIO
+                        if (ContextCompat.checkSelfPermission(context, permission) ==
+                            PackageManager.PERMISSION_GRANTED
+                        ) startOrStopRecording()
+                        else recordPermissionLauncher.launch(permission)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0088FF)),
+                    modifier = Modifier
+                        .fillMaxWidth(0.7f)
+                        .height(36.dp)
+                ) {
+                    Text(if (isRecording) "Detener" else "Grabar", color = Color.White)
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Botón Reproducir
                 lastAudioFile?.let { file ->
                     if (file.exists()) {
-                        Box(modifier = Modifier.fillMaxWidth()) {
-                            Button(
-                                onClick = { playAudio() },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6A1B9A)),
-                                modifier = Modifier
-                                    .align(Alignment.Center)
-                                    .fillMaxWidth(0.7f)
-                                    .height(36.dp)
-                            ) {
-                                Text(
-                                    if (isPlaying) "⏹ Detener" else "▶ Reproducir",
-                                    color = Color.White,
-                                    fontSize = MaterialTheme.typography.labelLarge.fontSize
-                                )
-                            }
+                        Button(
+                            onClick = { playAudio() },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6A1B9A)),
+                            modifier = Modifier
+                                .fillMaxWidth(0.7f)
+                                .height(36.dp)
+                        ) {
+                            Text(
+                                if (isPlaying) "⏹ Detener" else "▶ Reproducir",
+                                color = Color.White
+                            )
                         }
-
-                        Spacer(modifier = Modifier.height(8.dp))
                     }
                 }
             }

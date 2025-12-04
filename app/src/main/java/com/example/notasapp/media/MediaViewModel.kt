@@ -14,7 +14,6 @@ class MediaViewModel(application: Application, private val repository: MediaRepo
 
     val mediaList = repository.getAll().stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    // ---- ÚNICO CAMBIO: AGREGAR type ----
     fun insertUri(uriString: String, type: String) {
         viewModelScope.launch {
             repository.insert(MediaEntity(uri = uriString, type = type))

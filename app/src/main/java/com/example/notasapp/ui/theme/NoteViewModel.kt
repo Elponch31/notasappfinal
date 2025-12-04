@@ -19,6 +19,9 @@ class NoteViewModel(private val repository: NoteRepository) : ViewModel() {
     val audioPath = MutableStateFlow<String?>(null)
     val currentNote = MutableStateFlow<Note?>(null)
 
+
+    val remindersJson = MutableStateFlow<String?>(null)
+
     init {
         loadNotes()
     }
@@ -35,7 +38,8 @@ class NoteViewModel(private val repository: NoteRepository) : ViewModel() {
                 Note(
                     title = title.value,
                     content = content.value,
-                    audioPath = audioPath.value
+                    audioPath = audioPath.value,
+                    remindersJson = remindersJson.value.toString()
                 )
             )
             loadNotes()
@@ -49,7 +53,8 @@ class NoteViewModel(private val repository: NoteRepository) : ViewModel() {
                     id = id,
                     title = title.value,
                     content = content.value,
-                    audioPath = audioPath.value
+                    audioPath = audioPath.value,
+                    remindersJson = remindersJson.value.toString()  // ← AGREGADO
                 )
             )
             loadNotes()
@@ -72,17 +77,19 @@ class NoteViewModel(private val repository: NoteRepository) : ViewModel() {
                     title.value = it.title
                     content.value = it.content
                     audioPath.value = it.audioPath
+
+                    remindersJson.value = it.remindersJson
                 }
             }
         }
     }
-
 
     fun clearNote() {
         title.value = ""
         content.value = ""
         audioPath.value = null
         currentNote.value = null
+        remindersJson.value = null
     }
 }
 

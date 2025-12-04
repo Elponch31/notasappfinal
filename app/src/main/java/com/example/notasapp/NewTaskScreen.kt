@@ -1,6 +1,11 @@
 package com.example.notasapp
 
 import android.Manifest
+import android.app.AlarmManager
+import android.app.DatePickerDialog
+import android.app.PendingIntent
+import android.app.TimePickerDialog
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -23,6 +28,7 @@ import com.example.notasapp.media.MediaViewModel
 import com.example.notasapp.media.PhotosScreen
 import com.example.notasapp.ui.theme.TaskViewModel
 import java.io.File
+import java.util.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.TopAppBar
@@ -42,6 +48,8 @@ fun NewTaskScreen(
     val context = LocalContext.current
     val title by vm.title.collectAsState()
     val content by vm.content.collectAsState()
+    val reminders by vm.reminders.collectAsState()   // 🔔 LISTA DE RECORDATORIOS
+
     val audioRecorder = remember { AudioRecorder(context) }
 
     var isRecording by remember { mutableStateOf(false) }
@@ -55,8 +63,8 @@ fun NewTaskScreen(
     ) { uri: Uri? ->
         uri?.let { vm.addAttachedFile(it) }
     }
-    // ----------------------------------------------------------
 
+    // ------------------ BOTONES DE AUDIO ---------------------
     fun startOrStopRecording() {
         val outputFile = File(context.filesDir, "audio_${System.currentTimeMillis()}.m4a")
         if (!isRecording) {
@@ -82,6 +90,7 @@ fun NewTaskScreen(
         }
     }
 
+    // ---------------- PERMISOS DE MICROFONO -------------------
     val recordPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -89,6 +98,63 @@ fun NewTaskScreen(
         else Toast.makeText(context, "Permiso de micrófono denegado", Toast.LENGTH_SHORT).show()
     }
 
+    // ============================================================
+    // 🔔 FUNCIÓN PARA PROGRAMAR ALARMAS PARA CADA RECORDATORIO
+    // ============================================================
+    fun programarAlarma(timestamp: Long, titulo: String) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+        val intent = Intent(context, ReminderReceiver::class.java).apply {
+            putExtra("title", titulo)
+        }
+
+        val pending = PendingIntent.getBroadcast(
+            context,
+            timestamp.hashCode(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        alarmManager.setExactAndAllowWhileIdle(
+            AlarmManager.RTC_WAKEUP,
+            timestamp,
+            pending
+        )
+    }
+
+    // ============================================================
+    // 🔔 UI PARA AÑADIR RECORDATORIOS MANUALMENTE
+    // ============================================================
+    fun agregarRecordatorio() {
+        val calendar = Calendar.getInstance()
+
+        DatePickerDialog(
+            context,
+            { _, year, month, day ->
+                TimePickerDialog(
+                    context,
+                    { _, hour, minute ->
+                        calendar.set(year, month, day, hour, minute, 0)
+                        val millis = calendar.timeInMillis
+
+                        vm.addReminder(millis)
+
+                        Toast.makeText(context, "Recordatorio agregado", Toast.LENGTH_SHORT).show()
+                    },
+                    calendar.get(Calendar.HOUR_OF_DAY),
+                    calendar.get(Calendar.MINUTE),
+                    true
+                ).show()
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        ).show()
+    }
+
+    // =============================================================
+    // CARGAR DATOS AL EDITAR
+    // =============================================================
     LaunchedEffect(taskId) {
         vm.loadTaskById(taskId)
         vm.audioPath.value?.let { path ->
@@ -97,6 +163,9 @@ fun NewTaskScreen(
         }
     }
 
+    // =============================================================
+    // 👇 UI COMPLETA
+    // =============================================================
     Scaffold(
         topBar = {
             TopAppBar(
@@ -131,7 +200,15 @@ fun NewTaskScreen(
                 Button(
                     onClick = {
                         vm.audioPath.value = lastAudioFile?.absolutePath
+
+                        // Guardar tarea
                         if (taskId == 0) vm.addTask() else vm.updateTask(taskId)
+
+                        // Programar recordatorios
+                        reminders.forEach { time ->
+                            programarAlarma(time, title)
+                        }
+
                         navController.popBackStack()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
@@ -148,11 +225,13 @@ fun NewTaskScreen(
             }
         }
     ) { padding ->
+
         Column(
             modifier = Modifier
                 .padding(padding)
                 .padding(8.dp)
         ) {
+
             // ---------------- Título ----------------
             OutlinedTextField(
                 value = title,
@@ -172,31 +251,57 @@ fun NewTaskScreen(
                 maxLines = 4
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // ---------------- Botón para adjuntar archivos ----------------
+            // ============================================================
+            // 🔔 BOTÓN PARA AGREGAR RECORDATORIOS
+            // ============================================================
+            Button(
+                onClick = { agregarRecordatorio() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Añadir recordatorio ⏰")
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // ============================================================
+            // 🔔 LISTA DE RECORDATORIOS
+            // ============================================================
+            reminders.forEach { timestamp ->
+                val fecha = Date(timestamp).toString()
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = fecha, modifier = Modifier.weight(1f))
+
+                    IconButton(onClick = { vm.removeReminder(timestamp) }) {
+                        Icon(Icons.Default.Delete, contentDescription = "Eliminar")
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ---------------- Adjuntar archivos ----------------
             Button(
                 onClick = { filePickerLauncher.launch("*/*") },
-                modifier = Modifier
-                    .fillMaxWidth(0.7f)
-                    .align(Alignment.CenterHorizontally)
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Adjuntar archivo")
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // ---------------- Lista de archivos adjuntos ----------------
             attachedFiles.forEach { uri ->
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 2.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Abrir archivo al click
                     Text(
-                        text = uri.lastPathSegment ?: "Archivo seleccionado",
+                        text = uri.lastPathSegment ?: "Archivo",
                         modifier = Modifier
                             .weight(1f)
                             .clickable {
@@ -208,21 +313,15 @@ fun NewTaskScreen(
                             }
                     )
 
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    // Botón eliminar
                     IconButton(onClick = { vm.removeAttachedFile(uri) }) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Eliminar archivo"
-                        )
+                        Icon(Icons.Default.Delete, contentDescription = "Eliminar")
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // ---------------- Fotos y videos ----------------
+            // ---------------- Fotos ----------------
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -231,57 +330,36 @@ fun NewTaskScreen(
                 PhotosScreen(mediaVm)
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // ---------------- Grabación de audio ----------------
+            // ---------------- AUDIO ----------------
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
 
-                // Botón Grabar
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    Button(
-                        onClick = {
-                            val permission = Manifest.permission.RECORD_AUDIO
-                            if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED)
-                                startOrStopRecording()
-                            else recordPermissionLauncher.launch(permission)
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0088FF)),
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .fillMaxWidth(0.7f)
-                            .height(36.dp)
-                    ) {
-                        Text(
-                            if (isRecording) "Detener" else "Grabar",
-                            color = Color.White,
-                            fontSize = MaterialTheme.typography.labelLarge.fontSize
-                        )
-                    }
+                Button(
+                    onClick = {
+                        val permission = Manifest.permission.RECORD_AUDIO
+                        if (ContextCompat.checkSelfPermission(context, permission)
+                            == PackageManager.PERMISSION_GRANTED
+                        ) startOrStopRecording()
+                        else recordPermissionLauncher.launch(permission)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0088FF)),
+                    modifier = Modifier.fillMaxWidth(0.7f)
+                ) {
+                    Text(if (isRecording) "Detener" else "Grabar", color = Color.White)
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Botón Reproducir
                 lastAudioFile?.let { file ->
                     if (file.exists()) {
-                        Box(modifier = Modifier.fillMaxWidth()) {
-                            Button(
-                                onClick = { playAudio() },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6A1B9A)),
-                                modifier = Modifier
-                                    .align(Alignment.Center)
-                                    .fillMaxWidth(0.7f)
-                                    .height(36.dp)
-                            ) {
-                                Text(
-                                    if (isPlaying) "⏹ Detener" else "▶ Reproducir",
-                                    color = Color.White,
-                                    fontSize = MaterialTheme.typography.labelLarge.fontSize
-                                )
-                            }
+                        Button(
+                            onClick = { playAudio() },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6A1B9A)),
+                            modifier = Modifier.fillMaxWidth(0.7f)
+                        ) {
+                            Text(if (isPlaying) "Detener" else "Reproducir", color = Color.White)
                         }
-
-                        Spacer(modifier = Modifier.height(8.dp))
                     }
                 }
             }

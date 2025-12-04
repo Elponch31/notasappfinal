@@ -8,6 +8,7 @@ data class Task(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val title: String,
     val content: String,
-    val audioPath: String? = null
+    val audioPath: String? = null,
 
+    val reminders: String? = null
 )

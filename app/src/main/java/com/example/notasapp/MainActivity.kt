@@ -1,5 +1,12 @@
 package com.example.notasapp
 
+import android.app.AlarmManager
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -17,8 +24,12 @@ import com.example.notasapp.ui.theme.TaskViewModelFactory
 import com.example.notasapp.ui.theme.NotasAppTheme
 
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // 🔔 Crear canal de notificaciones
+        crearCanalNotificaciones()
 
         val database = NoteDatabase.getDatabase(this)
         val noteRepository = NoteRepository(database.noteDao())
@@ -28,33 +39,76 @@ class MainActivity : ComponentActivity() {
             NotasAppTheme {
                 val navController: NavHostController = rememberNavController()
 
-                // ViewModels
-                val noteVm: NoteViewModel = viewModel(factory = NoteViewModelFactory(noteRepository))
-                val taskVm: TaskViewModel = viewModel(factory = TaskViewModelFactory(taskRepository))
-                val mediaVm: MediaViewModel = viewModel(factory = MediaViewModelFactory(application = application))
+                val noteVm: NoteViewModel =
+                    viewModel(factory = NoteViewModelFactory(noteRepository))
+
+                val taskVm: TaskViewModel =
+                    viewModel(factory = TaskViewModelFactory(taskRepository))
+
+                val mediaVm: MediaViewModel =
+                    viewModel(factory = MediaViewModelFactory(application))
 
                 NavHost(
                     navController = navController,
                     startDestination = "notes"
                 ) {
-                    // Pantalla principal
                     composable("notes") {
                         NotesScreen(navController, noteVm, taskVm, mediaVm)
                     }
 
-                    // Nueva nota / editar nota
                     composable("new_note/{noteId}") { backStackEntry ->
-                        val noteId = backStackEntry.arguments?.getString("noteId")?.toIntOrNull() ?: 0
-                        NewNoteScreen(navController, noteVm,mediaVm, noteId)
+                        val noteId =
+                            backStackEntry.arguments?.getString("noteId")?.toIntOrNull() ?: 0
+                        NewNoteScreen(navController, noteVm, mediaVm, noteId)
                     }
 
-                    // Nueva tarea / editar tarea
                     composable("new_task/{taskId}") { backStackEntry ->
-                        val taskId = backStackEntry.arguments?.getString("taskId")?.toIntOrNull() ?: 0
+                        val taskId =
+                            backStackEntry.arguments?.getString("taskId")?.toIntOrNull() ?: 0
                         NewTaskScreen(navController, taskVm, mediaVm, taskId)
                     }
                 }
             }
         }
+    }
+
+    // ============================================================
+    // 🔔 CANAL DE NOTIFICACIONES (OBLIGATORIO PARA ANDROID 8+)
+    // ============================================================
+    private fun crearCanalNotificaciones() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                "recordatorios_ch",
+                "Recordatorios",
+                NotificationManager.IMPORTANCE_HIGH
+            )
+            channel.description = "Canal para recordatorios de notas"
+
+            val manager = getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(channel)
+        }
+    }
+
+    // ============================================================
+    // ⏰ Programar recordatorio desde cualquier parte
+    // ============================================================
+    fun programarRecordatorio(titulo: String, tiempoEnMilis: Long) {
+        val intent = Intent(this, ReminderReceiver::class.java).apply {
+            putExtra("titulo", titulo)
+        }
+
+        val pending = PendingIntent.getBroadcast(
+            this,
+            System.currentTimeMillis().toInt(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        alarmManager.setExactAndAllowWhileIdle(
+            AlarmManager.RTC_WAKEUP,
+            tiempoEnMilis,
+            pending
+        )
     }
 }
