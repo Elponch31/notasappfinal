@@ -48,7 +48,7 @@ fun NewTaskScreen(
     val context = LocalContext.current
     val title by vm.title.collectAsState()
     val content by vm.content.collectAsState()
-    val reminders by vm.reminders.collectAsState()   // 🔔 LISTA DE RECORDATORIOS
+    val reminders by vm.reminders.collectAsState()
 
     val audioRecorder = remember { AudioRecorder(context) }
 
@@ -56,7 +56,6 @@ fun NewTaskScreen(
     var isPlaying by remember { mutableStateOf(false) }
     var lastAudioFile by remember { mutableStateOf<File?>(null) }
 
-    // ------------------- Archivos adjuntos -------------------
     val attachedFiles = vm.attachedFiles
     val filePickerLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
@@ -64,7 +63,6 @@ fun NewTaskScreen(
         uri?.let { vm.addAttachedFile(it) }
     }
 
-    // ------------------ BOTONES DE AUDIO ---------------------
     fun startOrStopRecording() {
         val outputFile = File(context.filesDir, "audio_${System.currentTimeMillis()}.m4a")
         if (!isRecording) {
@@ -90,7 +88,6 @@ fun NewTaskScreen(
         }
     }
 
-    // ---------------- PERMISOS DE MICROFONO -------------------
     val recordPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -98,14 +95,13 @@ fun NewTaskScreen(
         else Toast.makeText(context, "Permiso de micrófono denegado", Toast.LENGTH_SHORT).show()
     }
 
-    // ============================================================
-    // 🔔 FUNCIÓN PARA PROGRAMAR ALARMAS PARA CADA RECORDATORIO
-    // ============================================================
+
     fun programarAlarma(timestamp: Long, titulo: String) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
         val intent = Intent(context, ReminderReceiver::class.java).apply {
             putExtra("title", titulo)
+            putExtra("taskId", taskId)   // 👈🔥 AGREGADO
         }
 
         val pending = PendingIntent.getBroadcast(
@@ -122,9 +118,7 @@ fun NewTaskScreen(
         )
     }
 
-    // ============================================================
-    // 🔔 UI PARA AÑADIR RECORDATORIOS MANUALMENTE
-    // ============================================================
+
     fun agregarRecordatorio() {
         val calendar = Calendar.getInstance()
 
@@ -152,9 +146,6 @@ fun NewTaskScreen(
         ).show()
     }
 
-    // =============================================================
-    // CARGAR DATOS AL EDITAR
-    // =============================================================
     LaunchedEffect(taskId) {
         vm.loadTaskById(taskId)
         vm.audioPath.value?.let { path ->
@@ -163,9 +154,6 @@ fun NewTaskScreen(
         }
     }
 
-    // =============================================================
-    // 👇 UI COMPLETA
-    // =============================================================
     Scaffold(
         topBar = {
             TopAppBar(
@@ -201,10 +189,8 @@ fun NewTaskScreen(
                     onClick = {
                         vm.audioPath.value = lastAudioFile?.absolutePath
 
-                        // Guardar tarea
                         if (taskId == 0) vm.addTask() else vm.updateTask(taskId)
 
-                        // Programar recordatorios
                         reminders.forEach { time ->
                             programarAlarma(time, title)
                         }
@@ -232,7 +218,6 @@ fun NewTaskScreen(
                 .padding(8.dp)
         ) {
 
-            // ---------------- Título ----------------
             OutlinedTextField(
                 value = title,
                 onValueChange = { vm.title.value = it },
@@ -253,9 +238,6 @@ fun NewTaskScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // ============================================================
-            // 🔔 BOTÓN PARA AGREGAR RECORDATORIOS
-            // ============================================================
             Button(
                 onClick = { agregarRecordatorio() },
                 modifier = Modifier.fillMaxWidth()
@@ -265,9 +247,7 @@ fun NewTaskScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // ============================================================
-            // 🔔 LISTA DE RECORDATORIOS
-            // ============================================================
+
             reminders.forEach { timestamp ->
                 val fecha = Date(timestamp).toString()
 
@@ -287,7 +267,6 @@ fun NewTaskScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // ---------------- Adjuntar archivos ----------------
             Button(
                 onClick = { filePickerLauncher.launch("*/*") },
                 modifier = Modifier.fillMaxWidth()
@@ -321,7 +300,6 @@ fun NewTaskScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // ---------------- Fotos ----------------
             Box(
                 modifier = Modifier
                     .fillMaxWidth()

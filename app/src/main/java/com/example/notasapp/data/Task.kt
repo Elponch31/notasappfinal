@@ -9,6 +9,5 @@ data class Task(
     val title: String,
     val content: String,
     val audioPath: String? = null,
-
     val reminders: String? = null
 )

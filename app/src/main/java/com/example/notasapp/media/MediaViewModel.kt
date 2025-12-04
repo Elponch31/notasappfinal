@@ -19,7 +19,7 @@ class MediaViewModel(application: Application, private val repository: MediaRepo
             repository.insert(MediaEntity(uri = uriString, type = type))
         }
     }
-    // -------------------------------------
+
 
     fun delete(media: MediaEntity) {
         viewModelScope.launch {

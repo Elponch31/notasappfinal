@@ -28,15 +28,18 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 🔔 Crear canal de notificaciones
         crearCanalNotificaciones()
 
         val database = NoteDatabase.getDatabase(this)
         val noteRepository = NoteRepository(database.noteDao())
         val taskRepository = TaskRepository(database.taskDao())
 
+
+        val taskIdDesdeNotificacion = intent.getIntExtra("taskId", 0)
+
         setContent {
             NotasAppTheme {
+
                 val navController: NavHostController = rememberNavController()
 
                 val noteVm: NoteViewModel =
@@ -47,6 +50,12 @@ class MainActivity : ComponentActivity() {
 
                 val mediaVm: MediaViewModel =
                     viewModel(factory = MediaViewModelFactory(application))
+
+                androidx.compose.runtime.LaunchedEffect(taskIdDesdeNotificacion) {
+                    if (taskIdDesdeNotificacion != 0) {
+                        navController.navigate("new_task/$taskIdDesdeNotificacion")
+                    }
+                }
 
                 NavHost(
                     navController = navController,
@@ -72,9 +81,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // ============================================================
-    // 🔔 CANAL DE NOTIFICACIONES (OBLIGATORIO PARA ANDROID 8+)
-    // ============================================================
     private fun crearCanalNotificaciones() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -89,9 +95,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // ============================================================
-    // ⏰ Programar recordatorio desde cualquier parte
-    // ============================================================
     fun programarRecordatorio(titulo: String, tiempoEnMilis: Long) {
         val intent = Intent(this, ReminderReceiver::class.java).apply {
             putExtra("titulo", titulo)

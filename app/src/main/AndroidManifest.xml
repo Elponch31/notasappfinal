@@ -2,7 +2,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- PERMISOS NECESARIOS -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -28,7 +27,6 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Notasapp">
 
-        <!-- ✔ EL RECEIVER DEL RECORDATORIO -->
         <receiver
             android:name=".ReminderReceiver"
             android:exported="true" />

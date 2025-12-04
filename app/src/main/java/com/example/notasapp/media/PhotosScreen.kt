@@ -25,7 +25,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.clickable
-
+import android.widget.Toast
+import android.provider.Settings
 
 fun loadThumbnail(context: Context, uri: Uri, isVideo: Boolean): Bitmap? {
     return try {
@@ -53,6 +54,7 @@ fun loadThumbnail(context: Context, uri: Uri, isVideo: Boolean): Bitmap? {
 
 @Composable
 fun PhotosScreen(mediaVm: MediaViewModel) {
+
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val mediaList by mediaVm.mediaList.collectAsState(initial = emptyList())
@@ -60,11 +62,13 @@ fun PhotosScreen(mediaVm: MediaViewModel) {
     var pendingPhotoUri by remember { mutableStateOf<Uri?>(null) }
     var pendingVideoUri by remember { mutableStateOf<Uri?>(null) }
 
+    var deniedCount by remember { mutableStateOf(0) }
+
     val takePictureLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicture()
     ) { success ->
         if (success)
-            pendingPhotoUri?.let { mediaVm.insertUri(it.toString(), "image") }  // ← CAMBIO
+            pendingPhotoUri?.let { mediaVm.insertUri(it.toString(), "image") }
         pendingPhotoUri = null
     }
 
@@ -72,13 +76,14 @@ fun PhotosScreen(mediaVm: MediaViewModel) {
         ActivityResultContracts.CaptureVideo()
     ) { success ->
         if (success)
-            pendingVideoUri?.let { mediaVm.insertUri(it.toString(), "video") }  // ← CAMBIO
+            pendingVideoUri?.let { mediaVm.insertUri(it.toString(), "video") }
         pendingVideoUri = null
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { result ->
+
         val cameraGranted = result[Manifest.permission.CAMERA] ?: false
         val audioGranted = result[Manifest.permission.RECORD_AUDIO] ?: true
         val readImagesGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
@@ -86,9 +91,25 @@ fun PhotosScreen(mediaVm: MediaViewModel) {
         val readVideosGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
             result[Manifest.permission.READ_MEDIA_VIDEO] ?: false else true
 
-        if (cameraGranted && audioGranted && readImagesGranted && readVideosGranted) {
+        val allGranted = cameraGranted && audioGranted && readImagesGranted && readVideosGranted
+
+        if (allGranted) {
+            deniedCount = 0 // reset
             pendingPhotoUri?.let { takePictureLauncher.launch(it) }
             pendingVideoUri?.let { takeVideoLauncher.launch(it) }
+        } else {
+
+            deniedCount++
+
+            if (deniedCount >= 3) {
+                Toast.makeText(
+                    context,
+                    "Debe otorgar los permisos manualmente en Ajustes.",
+                    Toast.LENGTH_LONG
+                ).show()
+
+                openAppSettings(context)
+            }
         }
     }
 
@@ -146,6 +167,7 @@ fun PhotosScreen(mediaVm: MediaViewModel) {
         Spacer(modifier = Modifier.height(8.dp))
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+
             FloatingActionButton(
                 onClick = {
                     pendingPhotoUri = createImageUri()
@@ -186,7 +208,7 @@ fun MediaRow(media: MediaEntity, onDelete: (MediaEntity) -> Unit) {
             .fillMaxWidth()
             .height(80.dp)
             .padding(vertical = 4.dp)
-            .clickable { openMedia(context, media) },   // ← AGREGADO
+            .clickable { openMedia(context, media) },
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Row(
@@ -218,6 +240,7 @@ fun MediaRow(media: MediaEntity, onDelete: (MediaEntity) -> Unit) {
         }
     }
 }
+
 fun openMedia(context: Context, media: MediaEntity) {
     try {
         val uri = Uri.parse(media.uri)
@@ -235,7 +258,15 @@ fun openMedia(context: Context, media: MediaEntity) {
 
     } catch (e: Exception) {
         e.printStackTrace()
-        android.widget.Toast.makeText(context, "No se pudo abrir el archivo", android.widget.Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "No se pudo abrir el archivo", Toast.LENGTH_SHORT).show()
     }
 }
 
+fun openAppSettings(context: Context) {
+    val intent = android.content.Intent(
+        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+        Uri.fromParts("package", context.packageName, null)
+    )
+    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+    context.startActivity(intent)
+}
